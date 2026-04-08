@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FryCheck — Fast Food Nutrition & Oil Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0ede8;
+    --muted: #7a7570;
+    --accent: #e8c547;
+    --accent2: #e87c47;
+    --good: #4caf7d;
+    --mod: #e8c547;
+    --bad: #e85447;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .hero {
+    position: relative;
+    padding: 80px 40px 60px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: 'FRYCHECK';
+    position: absolute;
+    font-family: var(--font-display);
+    font-size: clamp(120px, 20vw, 280px);
+    color: rgba(255,255,255,0.02);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+  }
+
+  .hero-tag {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 14px;
+    border-radius: 99px;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.1s;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 8vw, 96px);
+    letter-spacing: 0.03em;
+    line-height: 0.95;
+    margin-bottom: 16px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.2s;
+  }
+
+  .hero h1 span { color: var(--accent); }
+
+  .hero p {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto 40px;
+    font-weight: 300;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.3s;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Chain selector */
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .chains-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+
+  .chain-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .chain-btn .emoji { font-size: 20px; }
+  .chain-btn .name { font-weight: 500; }
+  .chain-btn .country { font-size: 11px; color: var(--muted); }
+
+  .chain-btn:hover {
+    border-color: var(--border2);
+    background: var(--surface2);
+    transform: translateY(-2px);
+  }
+
+  .chain-btn.active {
+    border-color: var(--accent);
+    background: rgba(232, 197, 71, 0.08);
+  }
+
+  .chain-btn.active .name { color: var(--accent); }
+
+  /* Search bar */
+  .search-wrap {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 48px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 6px 6px 16px;
+    transition: border-color 0.2s;
+  }
+
+  .search-wrap:focus-within { border-color: var(--border2); }
+
+  .search-wrap input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+  }
+
+  .search-wrap input::placeholder { color: var(--muted); }
+
+  .search-wrap button {
+    background: var(--accent);
+    border: none;
+    color: #000;
+    font-family: var(--font-display);
+    font-size: 16px;
+    letter-spacing: 0.05em;
+    padding: 10px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+
+  .search-wrap button:hover { opacity: 0.85; }
+
+  /* Loading */
+  .loading-state {
+    text-align: center;
+    padding: 80px 20px;
+    display: none;
+  }
+
+  .loading-state.active { display: block; }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-state p { color: var(--muted); font-size: 13px; }
+
+  /* Results */
+  #results { display: none; }
+  #results.active { display: block; }
+
+  /* Summary strip */
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 600px) { .summary-strip { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .stat-card .val {
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .lbl {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+
+  /* Oil card */
+  .oil-card {
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .oil-card.good { background: rgba(76,175,125,0.07); border-color: rgba(76,175,125,0.25); }
+  .oil-card.moderate { background: rgba(232,197,71,0.07); border-color: rgba(232,197,71,0.25); }
+  .oil-card.poor { background: rgba(232,84,71,0.07); border-color: rgba(232,84,71,0.25); }
+
+  .oil-rating-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .oil-rating-badge.good { background: rgba(76,175,125,0.2); }
+  .oil-rating-badge.moderate { background: rgba(232,197,71,0.2); }
+  .oil-rating-badge.poor { background: rgba(232,84,71,0.2); }
+
+  .oil-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 4px; }
+  .oil-name { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+  .oil-note { font-size: 13px; color: var(--muted); font-weight: 300; line-height: 1.5; }
+
+  .health-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 99px;
+    margin-bottom: 8px;
+  }
+
+  .health-tag.good { background: rgba(76,175,125,0.2); color: var(--good); }
+  .health-tag.moderate { background: rgba(232,197,71,0.2); color: var(--mod); }
+  .health-tag.poor { background: rgba(232,84,71,0.2); color: var(--bad); }
+
+  /* Items table */
+  .items-section { margin-top: 8px; }
+
+  .items-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .items-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.03em;
+  }
+
+  .sort-btns { display: flex; gap: 6px; }
+
+  .sort-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .sort-btn:hover, .sort-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  .items-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+    transition: border-color 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .item-card:hover { border-color: var(--border2); }
+
+  .item-name { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+
+  .item-macros { display: flex; gap: 12px; }
+
+  .macro { font-size: 12px; color: var(--muted); }
+  .macro span { color: var(--text); font-weight: 500; }
+
+  .item-cal-wrap { text-align: right; }
+
+  .item-cal {
+    font-family: var(--font-display);
+    font-size: 26px;
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
+
+  .item-cal-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); }
+
+  .cal-bar-wrap { width: 100%; height: 2px; background: var(--border); border-radius: 99px; margin-top: 8px; }
+  .cal-bar { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.6s ease; }
+  .cal-bar.high { background: var(--bad); }
+  .cal-bar.mid { background: var(--mod); }
+
+  /* Source */
+  .source-note {
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .source-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
+
+  /* Empty / error */
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    border: 1px dashed var(--border2);
+    border-radius: 16px;
+  }
+
+  .empty-state .big { font-family: var(--font-display); font-size: 48px; letter-spacing: 0.03em; color: var(--muted); margin-bottom: 8px; }
+  .empty-state p { color: var(--muted); font-size: 14px; }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 40px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Disclaimer banner */
+  .disclaimer {
+    background: rgba(232,197,71,0.07);
+    border: 1px solid rgba(232,197,71,0.2);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 32px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .disclaimer-icon { color: var(--mod); flex-shrink: 0; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">Live nutritional data</div>
+  <h1>Fry<span>Check</span></h1>
+  <p>Real-time calorie counts, macro breakdowns, and frying oil health ratings across Ireland & UK's biggest fast food chains.</p>
+</div>
+
+<div class="main">
+
+  <div class="disclaimer">
+    <span class="disclaimer-icon">⚡</span>
+    <span>Data is fetched live via web search each time you make a request, pulling from each chain's official nutritional information. Figures may vary by location and menu updates.</span>
+  </div>
+
+  <div class="section-label">Select a chain</div>
+  <div class="chains-grid" id="chainsGrid">
+    <button class="chain-btn" data-chain="McDonald's"><span class="emoji">🍔</span><span class="name">McDonald's</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Burger King"><span class="emoji">👑</span><span class="name">Burger King</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="KFC"><span class="emoji">🍗</span><span class="name">KFC</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Subway"><span class="emoji">🥖</span><span class="name">Subway</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Domino's"><span class="emoji">🍕</span><span class="name">Domino's</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Five Guys"><span class="emoji">🍟</span><span class="name">Five Guys</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Nando's"><span class="emoji">🔥</span><span class="name">Nando's</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Supermac's"><span class="emoji">🇮🇪</span><span class="name">Supermac's</span><span class="country">Ireland</span></button>
+    <button class="chain-btn" data-chain="Burdock's"><span class="emoji">🐟</span><span class="name">Burdock's</span><span class="country">Ireland</span></button>
+    <button class="chain-btn" data-chain="Wendy's"><span class="emoji">🍔</span><span class="name">Wendy's</span><span class="country">IE / UK</span></button>
+    <button class="chain-btn" data-chain="Greggs"><span class="emoji">🥐</span><span class="name">Greggs</span><span class="country">UK</span></button>
+    <button class="chain-btn" data-chain="Pret a Manger"><span class="emoji">🥗</span><span class="name">Pret a Manger</span><span class="country">IE / UK</span></button>
+  </div>
+
+  <div class="section-label">Or search a specific item</div>
+  <div class="search-wrap">
+    <input type="text" id="itemInput" placeholder="e.g. Big Mac, Zinger Burger, Footlong, Large Fries..." />
+    <button id="searchBtn">SEARCH</button>
+  </div>
+
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <p id="loadingText">Fetching live data...</p>
+  </div>
+
+  <div id="results">
+    <div class="summary-strip" id="summaryStrip"></div>
+    <div id="oilCard"></div>
+    <div class="items-section">
+      <div class="items-header">
+        <div class="items-title" id="itemsTitle">Menu Items</div>
+        <div class="sort-btns">
+          <button class="sort-btn active" id="sortCal" onclick="sortItems('cal')">Calories</button>
+          <button class="sort-btn" id="sortPro" onclick="sortItems('protein')">Protein</button>
+          <button class="sort-btn" id="sortFat" onclick="sortItems('fat')">Fat</button>
+        </div>
+      </div>
+      <div class="items-list" id="itemsList"></div>
+    </div>
+    <div class="source-note" id="sourceNote"></div>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="big">SELECT A CHAIN</div>
+    <p>Click any chain above or type in a specific menu item to get live nutritional data.</p>
+  </div>
+
+</div>
+
+<div class="footer">
+  FryCheck — Live nutritional data powered by AI web search &nbsp;·&nbsp; Data sourced from official chain nutritional pages
+</div>
+
+<script>
+  let currentData = null;
+  let currentSort = 'cal';
+  let activeChain = null;
+
+  document.querySelectorAll('.chain-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.chain-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeChain = btn.dataset.chain;
+      fetchChain(activeChain);
+    });
+  });
+
+  document.getElementById('searchBtn').addEventListener('click', doSearch);
+  document.getElementById('itemInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  function doSearch() {
+    const item = document.getElementById('itemInput').value.trim();
+    if (!item) return;
+    const chain = activeChain || 'any major fast food chain';
+    fetchItem(item, chain);
+  }
+
+  function setLoading(msg) {
+    document.getElementById('loadingState').classList.add('active');
+    document.getElementById('loadingText').textContent = msg;
+    document.getElementById('results').classList.remove('active');
+    document.getElementById('emptyState').style.display = 'none';
+  }
+
+  function clearLoading() {
+    document.getElementById('loadingState').classList.remove('active');
+  }
+
+  async function fetchChain(chain) {
+    setLoading('Fetching live data for ' + chain + '...');
+    const prompt = `You are a nutrition data assistant. Search the web for the current official nutritional information for ${chain} in Ireland or the UK.
+
+Return ONLY a valid JSON object with no markdown fences, no explanation, no preamble. Exactly this format:
+{
+  "chain": "${chain}",
+  "fryer_oil": "name of oil(s) used in fryers",
+  "oil_health_rating": "good|moderate|poor",
+  "oil_health_note": "2-3 sentences explaining the health implications of this oil - mention smoke point, fat type, trans fats if relevant",
+  "items": [
+    {"name": "item name", "calories": 500, "fat_g": 25, "protein_g": 28, "carbs_g": 45}
+  ],
+  "source": "official URL or source name"
+}
+Include 10-14 popular menu items. Calories must be integers.`;
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await resp.json();
+      const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const clean = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      currentData = parsed;
+      clearLoading();
+      render(parsed);
+    } catch(e) {
+      clearLoading();
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').innerHTML = '<div class="big">ERROR</div><p>Could not fetch data. Please try again.</p>';
+    }
+  }
+
+  async function fetchItem(item, chain) {
+    setLoading('Searching for "' + item + '" at ' + chain + '...');
+    const prompt = `You are a nutrition data assistant. Search the web for the current official nutritional information for "${item}" at ${chain} in Ireland or the UK.
+
+Return ONLY a valid JSON object with no markdown fences, no explanation, no preamble. Exactly this format:
+{
+  "chain": "${chain}",
+  "fryer_oil": "oil used in fryer, or N/A if not a fried item",
+  "oil_health_rating": "good|moderate|poor|na",
+  "oil_health_note": "2-3 sentences on health implications, or note that the item is not fried",
+  "items": [
+    {"name": "exact item name", "calories": 500, "fat_g": 25, "protein_g": 28, "carbs_g": 45}
+  ],
+  "source": "official URL or source name"
+}
+Include the searched item and any close variants. Calories must be integers.`;
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await resp.json();
+      const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const clean = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      currentData = parsed;
+      clearLoading();
+      render(parsed);
+    } catch(e) {
+      clearLoading();
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').innerHTML = '<div class="big">ERROR</div><p>Could not fetch data. Please try again.</p>';
+    }
+  }
+
+  function render(d) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('results').classList.add('active');
+
+    const items = d.items || [];
+    const cals = items.map(i => i.calories).filter(Boolean);
+    const low = cals.length ? Math.min(...cals) : 0;
+    const high = cals.length ? Math.max(...cals) : 0;
+    const avgCal = cals.length ? Math.round(cals.reduce((a,b) => a+b, 0) / cals.length) : 0;
+    const lowItem = items.find(i => i.calories === low);
+    const highItem = items.find(i => i.calories === high);
+
+    document.getElementById('summaryStrip').innerHTML = `
+      <div class="stat-card"><div class="val">${items.length}</div><div class="lbl">Items found</div></div>
+      <div class="stat-card"><div class="val">${avgCal}</div><div class="lbl">Avg kcal</div></div>
+      <div class="stat-card"><div class="val">${low}</div><div class="lbl">Lowest · ${lowItem ? lowItem.name.split(' ').slice(0,2).join(' ') : '—'}</div></div>
+      <div class="stat-card"><div class="val">${high}</div><div class="lbl">Highest · ${highItem ? highItem.name.split(' ').slice(0,2).join(' ') : '—'}</div></div>
+    `;
+
+    const rating = d.oil_health_rating || 'moderate';
+    const ratingLabel = rating === 'good' ? 'Healthier Choice' : rating === 'poor' ? 'Less Healthy' : rating === 'na' ? 'Not Fried' : 'Moderate';
+    const emoji = rating === 'good' ? '✓' : rating === 'poor' ? '✕' : rating === 'na' ? '—' : '~';
+
+    document.getElementById('oilCard').innerHTML = `
+      <div class="oil-card ${rating === 'na' ? 'moderate' : rating}">
+        <div class="oil-rating-badge ${rating === 'na' ? 'moderate' : rating}">${emoji}</div>
+        <div>
+          <div class="oil-title">Frying oil used</div>
+          <div class="oil-name">${d.fryer_oil || 'Unknown'}</div>
+          <span class="health-tag ${rating === 'na' ? 'moderate' : rating}">${ratingLabel}</span>
+          <div class="oil-note">${d.oil_health_note || ''}</div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('itemsTitle').textContent = d.chain + ' — Menu Items';
+    renderItems(items, high);
+
+    const src = d.source || 'Web search';
+    document.getElementById('sourceNote').innerHTML = `<div class="source-dot"></div> Live data · ${src}`;
+  }
+
+  function renderItems(items, maxCal) {
+    if (!items || !items.length) {
+      document.getElementById('itemsList').innerHTML = '<p style="color:var(--muted);font-size:13px;">No items found.</p>';
+      return;
+    }
+
+    let sorted = [...items];
+    if (currentSort === 'cal') sorted.sort((a, b) => (b.calories || 0) - (a.calories || 0));
+    else if (currentSort === 'protein') sorted.sort((a, b) => (b.protein_g || 0) - (a.protein_g || 0));
+    else if (currentSort === 'fat') sorted.sort((a, b) => (b.fat_g || 0) - (a.fat_g || 0));
+
+    const max = Math.max(...sorted.map(i => i[currentSort === 'cal' ? 'calories' : currentSort === 'protein' ? 'protein_g' : 'fat_g'] || 0));
+
+    document.getElementById('itemsList').innerHTML = sorted.map((item, idx) => {
+      const val = currentSort === 'cal' ? item.calories : currentSort === 'protein' ? item.protein_g : item.fat_g;
+      const barPct = Math.round((val / max) * 100);
+      const barClass = item.calories > 800 ? 'high' : item.calories > 500 ? 'mid' : '';
+      return `<div class="item-card" style="animation-delay:${idx * 40}ms">
+        <div>
+          <div class="item-name">${item.name}</div>
+          <div class="item-macros">
+            <div class="macro">Fat <span>${item.fat_g || '?'}g</span></div>
+            <div class="macro">Protein <span>${item.protein_g || '?'}g</span></div>
+            <div class="macro">Carbs <span>${item.carbs_g || '?'}g</span></div>
+          </div>
+          <div class="cal-bar-wrap"><div class="cal-bar ${barClass}" style="width:${barPct}%"></div></div>
+        </div>
+        <div class="item-cal-wrap">
+          <div class="item-cal">${item.calories || '?'}</div>
+          <div class="item-cal-label">kcal</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function sortItems(type) {
+    currentSort = type;
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('sort' + (type === 'cal' ? 'Cal' : type === 'protein' ? 'Pro' : 'Fat')).classList.add('active');
+    if (currentData) renderItems(currentData.items, null);
+  }
+</script>
+</body>
+</html>
